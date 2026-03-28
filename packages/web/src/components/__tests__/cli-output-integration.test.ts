@@ -82,7 +82,7 @@ describe('ChatMessage CLI Output integration', () => {
     expect(container.textContent).toContain('CLI Output');
   });
 
-  it('callback origin: content text shown ABOVE CLI block', () => {
+  it('callback origin: content text shown ABOVE execution card', () => {
     const msg = {
       id: 'msg-3',
       type: 'assistant' as const,
@@ -98,9 +98,10 @@ describe('ChatMessage CLI Output integration', () => {
     });
     const text = container.textContent ?? '';
     const answerIdx = text.indexOf('Here is the answer');
-    const cliIdx = text.indexOf('CLI Output');
+    const cardIdx = text.indexOf('执行中: Read x.ts');
     expect(answerIdx).toBeGreaterThanOrEqual(0);
-    expect(cliIdx).toBeGreaterThan(answerIdx);
+    expect(cardIdx).toBeGreaterThan(answerIdx);
+    expect(text).not.toContain('CLI Output');
   });
 
   it('stream origin with only content (no tools) still renders CLI block', () => {

@@ -8,6 +8,7 @@ import { hexToRgba, tintedLight } from '@/lib/color-utils';
 import { getMentionRe, getMentionToCat } from '@/lib/mention-highlight';
 import { parseDirection } from '@/lib/parse-direction';
 import { type ChatMessage as ChatMessageType, useChatStore } from '@/stores/chatStore';
+import { AnswerExecutionCard, buildAnswerExecutionTitle } from './AnswerExecutionCard';
 import { CatAvatar } from './CatAvatar';
 import { ConnectorBubble } from './ConnectorBubble';
 import { ContentBlocks } from './ContentBlocks';
@@ -92,6 +93,7 @@ export function ChatMessage({ message, getCatById }: ChatMessageProps) {
   const isStreamOrigin = message.origin === 'stream';
   const cliEvents = toCliEvents(message.toolEvents, isStreamOrigin ? message.content : undefined);
   const hasCliBlock = cliEvents.length > 0;
+  const hasAnswerExecutionCard = !isStreamOrigin && cliEvents.some((event) => event.kind === 'tool_use');
   const cliStatus = message.isStreaming
     ? ('streaming' as const)
     : message.variant === 'error'
@@ -344,7 +346,14 @@ export function ChatMessage({ message, getCatById }: ChatMessageProps) {
               breedColor={catData?.color.primary}
             />
           )}
-          {hasCliBlock && (
+          {hasAnswerExecutionCard && (
+            <AnswerExecutionCard
+              events={cliEvents}
+              status={cliStatus}
+              title={hasTextContent ? undefined : buildAnswerExecutionTitle({ title: message.content, fallbackEvents: cliEvents })}
+            />
+          )}
+          {hasCliBlock && !hasAnswerExecutionCard && (
             <CliOutputBlock
               events={cliEvents}
               status={cliStatus}
