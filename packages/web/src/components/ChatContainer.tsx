@@ -44,6 +44,7 @@ import { QueuePanel } from './QueuePanel';
 import { ScrollToBottomButton } from './ScrollToBottomButton';
 import { SkillsPanel } from './SkillsPanel';
 import { SplitPaneView } from './SplitPaneView';
+import { buildTaskListSidebarItems, TaskListSidebar } from './TaskListSidebar';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ThreadExecutionBar } from './ThreadExecutionBar';
 import { ThreadSidebar } from './ThreadSidebar';
@@ -95,7 +96,8 @@ export function ChatContainer({ threadId }: ChatContainerProps) {
   const isExport = searchParams?.get('export') === 'true';
   // AC-6: research=multi hint from the Signal study button
   const isResearchMode = searchParams?.get('research') === 'multi';
-  const { clearTasks } = useTaskStore();
+  const clearTasks = useTaskStore((s) => s.clearTasks);
+  const persistedTasks = useTaskStore((s) => s.tasks);
   const { getCatById } = useCatData();
   const workspaceWorktreeId = useChatStore((s) => s.workspaceWorktreeId);
   usePreviewAutoOpen(workspaceWorktreeId);
@@ -231,6 +233,18 @@ export function ChatContainer({ threadId }: ChatContainerProps) {
     }
     return c;
   }, [messages]);
+
+  const sidebarTasks = useMemo(
+    () =>
+      buildTaskListSidebarItems({
+        targetCats,
+        catInvocations,
+        persistedTasks,
+        messages,
+        threadId,
+      }),
+    [targetCats, catInvocations, persistedTasks, messages, threadId],
+  );
 
   // Sync URL-driven threadId to store (store is follower, URL is source of truth)
   // setCurrentThread saves old thread state to map, restores new thread state.
@@ -476,12 +490,13 @@ export function ChatContainer({ threadId }: ChatContainerProps) {
             </div>
           )}
           {sidebarMenu === 'chat' && (
-            <main
-              ref={scrollContainerRef}
-              onScroll={handleScroll}
-              className="ui-shell-surface h-full overflow-y-auto p-4"
-              data-chat-container
-            >
+            <div className="ui-shell-surface flex h-full overflow-hidden px-4 py-4">
+              <main
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="h-full min-w-0 flex-1 overflow-y-auto pr-0 xl:pr-4"
+                data-chat-container
+              >
               {isLoadingHistory && <div className="text-center py-3 text-sm text-gray-400">加载历史消息...</div>}
               {!hasMore && messages.length > 0 && (
                 <div className="text-center py-3 text-xs text-gray-300">没有更多消息...</div>
@@ -519,7 +534,9 @@ export function ChatContainer({ threadId }: ChatContainerProps) {
                   observerKey={threadId}
                 />
               )}
-            </main>
+              </main>
+              <TaskListSidebar tasks={sidebarTasks} className="hidden w-[320px] shrink-0 lg:block" />
+            </div>
           )}
         </div>
 
