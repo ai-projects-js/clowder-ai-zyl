@@ -11,7 +11,7 @@
       "roles": ["architect", "peer-reviewer"],
       "lead": true,
       "available": true,
-      "evaluation": "主架构师+全栈开发，深度思考能力强，bug定位是弱项——定位不出来找砚砚(gpt52)"
+      "evaluation": "主架构师+全栈开发，深度思考能力强，bug 定位是弱项——定位不出来找砚砚(gpt52)"
     },
     "sonnet": {
       "family": "ragdoll",
