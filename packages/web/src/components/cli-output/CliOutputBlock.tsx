@@ -3,7 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import type { CliEvent, CliStatus } from '@/stores/chat-types';
+import { apiFetch } from '@/utils/api-client';
 import { LoadingSmall } from '../LoadingSmall';
+import { LoadingPointStyle } from '../LoadingPointStyle';
 
 /* ── Helpers ── */
 
@@ -40,6 +42,10 @@ function lighten(hex: string, ratio: number): string {
 
 /* ── Divider stays neutral; surface colors are now breed-tinted (see buildSurface) ── */
 const DIVIDER = '#334155';
+const LOCAL_PPT_FILE = {
+  name: 'NVIDIA_GTC_2026_华为风.pptx',
+  path: 'C:\\Users\\kagol\\.jiuwenclaw\\agent\\NVIDIA_GTC_2026_华为风.pptx',
+};
 
 /* ── Inline SVG icons (Lucide-style, from Pencil design) ── */
 
@@ -185,6 +191,51 @@ function PawPrint() {
 }
 
 /* ── Status helpers ── */
+
+function PptAttachmentCard() {
+  const [isOpening, setIsOpening] = useState(false);
+
+  async function handleOpen(): Promise<void> {
+    if (isOpening) return;
+    setIsOpening(true);
+    try {
+      await apiFetch('/api/workspace/open-local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: LOCAL_PPT_FILE.path }),
+      });
+    } finally {
+      setIsOpening(false);
+    }
+  }
+
+  return (
+    <div
+      data-testid="cli-output-ppt-card"
+      className="mt-3 flex items-center gap-3 rounded-2xl border border-[#E9E5DF] bg-[#FBF9F6] px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+    >
+      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#FFF1E8] text-[11px] font-semibold tracking-[0.16em] text-[#C96A22]">
+        PPT
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-[#1F2937]">{LOCAL_PPT_FILE.name}</div>
+        <div className="truncate text-xs text-[#8C8C8C]">本地 PowerPoint 文件</div>
+        <div className="mt-1 break-all text-[11px] leading-4 text-[#9A8F84]">{LOCAL_PPT_FILE.path}</div>
+      </div>
+      <button
+        type="button"
+        data-testid="cli-output-ppt-open"
+        onClick={() => {
+          void handleOpen();
+        }}
+        disabled={isOpening}
+        className="inline-flex flex-shrink-0 items-center rounded-full border border-[#D2CDC4] bg-white px-4 py-1.5 text-xs font-medium text-[#3F3B37] transition-colors hover:bg-[#F4F1EC] disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {isOpening ? '打开中' : '打开'}
+      </button>
+    </div>
+  );
+}
 
 function buildSummary(events: CliEvent[], status: CliStatus): string {
   const toolCount = events.filter((e) => e.kind === 'tool_use').length;
@@ -400,6 +451,7 @@ export function CliOutputBlock({
         className="cli-output-button w-full flex items-center gap-2 text-[14px] transition-colors"
         style={{ padding: '8px 0' }}
       >
+        { status === 'streaming' && <LoadingPointStyle className="w-4 h-4 flex-shrink-0" /> }
         { status === 'done' && 
           <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none">
             <mask id="mask_5" width="16.000000" height="16.000008" x="0.000000" y="0.000000" maskUnits="userSpaceOnUse">
@@ -561,6 +613,7 @@ export function CliOutputBlock({
           <MarkdownContent content={textEvents.map((e) => e.content).join('\n')} />
         </span>
       </div>
+      <PptAttachmentCard />
     </div>
   );
 }
