@@ -37,6 +37,7 @@ import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { GameOverlayConnector } from './game/GameOverlayConnector';
 import { HubListModal } from './HubListModal';
+import { IntentRecognitionPlaceholder } from './IntentRecognitionPlaceholder';
 import { MessageActions } from './MessageActions';
 import { MobileStatusSheet } from './MobileStatusSheet';
 import { ModelsPanel } from './ModelsPanel';
@@ -76,6 +77,7 @@ export function ChatContainer(props: ChatContainerProps) {
 function ThreadModeChatContainer({ threadId }: { threadId: string }) {
   const {
     messages,
+    isLoading,
     hasActiveInvocation,
     intentMode,
     targetCats,
@@ -334,6 +336,13 @@ function ThreadModeChatContainer({ threadId }: { threadId: string }) {
     return items;
   }, [messages]);
 
+  const pendingIntentRecognitionTimestamp = useMemo(() => {
+    if (!isLoading || !hasActiveInvocation || intentMode !== null) return null;
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.type !== 'user' || lastMessage.catId) return null;
+    return lastMessage.timestamp;
+  }, [hasActiveInvocation, intentMode, isLoading, messages]);
+
   const renderSingleMessage = useCallback(
     (msg: ChatMessageData) => (
       <MessageActions key={msg.id} message={msg} threadId={threadId}>
@@ -508,7 +517,7 @@ function ThreadModeChatContainer({ threadId }: { threadId: string }) {
             <main
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="ui-shell-surface h-full overflow-y-auto p-4"
+              className="ui-shell-surface h-full overflow-y-auto p-4 pt-[60px]"
               data-chat-container
             >
               {isLoadingHistory && <div className="text-center py-3 text-sm text-gray-400">加载历史消息...</div>}
@@ -534,6 +543,9 @@ function ThreadModeChatContainer({ threadId }: { threadId: string }) {
                     renderSingleMessage(item.msg)
                   ),
                 )
+              )}
+              {pendingIntentRecognitionTimestamp != null && (
+                <IntentRecognitionPlaceholder timestamp={pendingIntentRecognitionTimestamp} />
               )}
               <div ref={messagesEndRef} />
               {sidebarMenu === 'chat' && (

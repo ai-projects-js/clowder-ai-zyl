@@ -3,10 +3,20 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatContainer } from '@/components/ChatContainer';
 
+type MockMessage = {
+  id: string;
+  type: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  catId?: string;
+  isStreaming?: boolean;
+};
+
 type MockStoreState = {
-  messages: unknown[];
+  messages: MockMessage[];
+  isLoading: boolean;
   hasActiveInvocation: boolean;
-  intentMode: null;
+  intentMode: 'execute' | 'ideate' | null;
   targetCats: string[];
   catStatuses: Record<string, string>;
   catInvocations: Record<string, unknown>;
@@ -16,13 +26,12 @@ type MockStoreState = {
   clearUnread: ReturnType<typeof vi.fn>;
   confirmUnreadAck: ReturnType<typeof vi.fn>;
   armUnreadSuppression: ReturnType<typeof vi.fn>;
-  rightPanelMode: 'status' | 'workspace';
   uiThinkingExpandedByDefault: boolean;
   workspaceWorktreeId: string | null;
   splitPaneThreadIds: string[];
   setSplitPaneThreadIds: ReturnType<typeof vi.fn>;
   setSplitPaneTarget: ReturnType<typeof vi.fn>;
-  threads: Array<{ id: string; title?: string; projectPath?: string }>;
+  threads: Array<{ id: string; title?: string; projectPath?: string; bootcampState?: boolean }>;
   setCurrentProject: ReturnType<typeof vi.fn>;
   showVoteModal: boolean;
   setShowVoteModal: ReturnType<typeof vi.fn>;
@@ -30,8 +39,9 @@ type MockStoreState = {
   consumePendingNewThreadSend: ReturnType<typeof vi.fn>;
 };
 
-const createMockStoreState = (rightPanelMode: 'status' | 'workspace'): MockStoreState => ({
+const createMockStoreState = (): MockStoreState => ({
   messages: [],
+  isLoading: false,
   hasActiveInvocation: false,
   intentMode: null,
   targetCats: [],
@@ -43,7 +53,6 @@ const createMockStoreState = (rightPanelMode: 'status' | 'workspace'): MockStore
   clearUnread: vi.fn(),
   confirmUnreadAck: vi.fn(),
   armUnreadSuppression: vi.fn(),
-  rightPanelMode,
   uiThinkingExpandedByDefault: false,
   workspaceWorktreeId: null,
   splitPaneThreadIds: [],
@@ -57,7 +66,7 @@ const createMockStoreState = (rightPanelMode: 'status' | 'workspace'): MockStore
   consumePendingNewThreadSend: vi.fn(() => null),
 });
 
-let mockState = createMockStoreState('status');
+let mockState = createMockStoreState();
 
 vi.mock('@/stores/chatStore', () => ({
   useChatStore: (selector?: (state: MockStoreState) => unknown) => (selector ? selector(mockState) : mockState),
@@ -122,15 +131,16 @@ vi.mock('@/hooks/useChatSocketCallbacks', () => ({
   useChatSocketCallbacks: () => ({}),
 }));
 vi.mock('@/hooks/useCatData', () => ({
-  useCatData: () => ({ getCatById: vi.fn() }),
-}));
-vi.mock('@/hooks/useTheme', () => ({
-  useTheme: () => ({
-    theme: 'warm',
-    config: {
-      sidebar: { bg: '#fff' },
-      content: { bg: '#fff' },
-    },
+  useCatData: () => ({
+    getCatById: (id: string) =>
+      id === 'jiuwenclaw'
+        ? {
+            id: 'jiuwenclaw',
+            displayName: '办公助理',
+            avatar: '/avatars/jiuwenclaw.png',
+            color: { primary: '#D97A3A', secondary: '#F6E7DA' },
+          }
+        : undefined,
   }),
 }));
 vi.mock('@/hooks/usePreviewAutoOpen', () => ({ usePreviewAutoOpen: vi.fn() }));
@@ -147,7 +157,7 @@ vi.mock('@/utils/api-client', () => ({
 vi.mock('@/utils/userId', () => ({ getUserId: () => 'test-user' }));
 
 vi.mock('@/components/A2ACollapsible', () => ({ A2ACollapsible: () => null }));
-vi.mock('@/components/AgentsPanel', () => ({ AgentsPanel: () => null }));
+vi.mock('@/components/AgentsRootPanel', () => ({ AgentsRootPanel: () => null }));
 vi.mock('@/components/AuthorizationCard', () => ({ AuthorizationCard: () => null }));
 vi.mock('@/components/BootcampListModal', () => ({ BootcampListModal: () => null }));
 vi.mock('@/components/CatCafeHub', () => ({ CatCafeHub: () => null }));
@@ -157,35 +167,29 @@ vi.mock('@/components/ChatContainerHeader', () => ({
 }));
 vi.mock('@/components/ChatInput', () => ({ ChatInput: () => null }));
 vi.mock('@/components/ChatMessage', () => ({ ChatMessage: () => null }));
+vi.mock('@/components/ChatEmptyState', () => ({ ChatEmptyState: () => null }));
 vi.mock('@/components/game/GameOverlayConnector', () => ({ GameOverlayConnector: () => null }));
 vi.mock('@/components/HubListModal', () => ({ HubListModal: () => null }));
 vi.mock('@/components/MessageActions', () => ({
   MessageActions: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('@/components/MessageNavigator', () => ({ MessageNavigator: () => null }));
 vi.mock('@/components/MobileStatusSheet', () => ({ MobileStatusSheet: () => null }));
 vi.mock('@/components/ModelsPanel', () => ({ ModelsPanel: () => null }));
 vi.mock('@/components/ParallelStatusBar', () => ({ ParallelStatusBar: () => null }));
 vi.mock('@/components/QueuePanel', () => ({ QueuePanel: () => null }));
-vi.mock('@/components/RightStatusPanel', () => ({
-  RightStatusPanel: () => React.createElement('div', { 'data-testid': 'right-status-panel' }),
-}));
 vi.mock('@/components/ScrollToBottomButton', () => ({ ScrollToBottomButton: () => null }));
 vi.mock('@/components/SkillsPanel', () => ({ SkillsPanel: () => null }));
 vi.mock('@/components/SplitPaneView', () => ({ SplitPaneView: () => null }));
-vi.mock('@/components/ThinkingIndicator', () => ({ ThinkingIndicator: () => null }));
+vi.mock('@/components/ThinkingIndicator', () => ({
+  ThinkingIndicator: () => React.createElement('div', { 'data-testid': 'thinking-indicator' }, 'thinking'),
+}));
 vi.mock('@/components/ThreadExecutionBar', () => ({ ThreadExecutionBar: () => null }));
 vi.mock('@/components/ThreadSidebar', () => ({ ThreadSidebar: () => null }));
 vi.mock('@/components/VoteConfigModal', () => ({ VoteConfigModal: () => null }));
 vi.mock('@/components/VoteActiveBar', () => ({ VoteActiveBar: () => null }));
-vi.mock('@/components/WorkspacePanel', () => ({
-  WorkspacePanel: () => React.createElement('div', { 'data-testid': 'workspace-panel' }),
-}));
-vi.mock('@/components/workspace/ResizeHandle', () => ({
-  ResizeHandle: () => React.createElement('div', { 'data-testid': 'resize-handle' }),
-}));
+vi.mock('@/components/workspace/ResizeHandle', () => ({ ResizeHandle: () => null }));
 
-describe('ChatContainer right panel visibility', () => {
+describe('ChatContainer recognition loading placeholder', () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -204,7 +208,13 @@ describe('ChatContainer right panel visibility', () => {
     }));
   });
 
+  afterAll(() => {
+    delete (globalThis as { React?: typeof React }).React;
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  });
+
   beforeEach(() => {
+    mockState = createMockStoreState();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -213,31 +223,52 @@ describe('ChatContainer right panel visibility', () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    mockState = createMockStoreState('status');
   });
 
-  afterAll(() => {
-    delete (globalThis as { React?: typeof React }).React;
-    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
-  });
-
-  it('does not render the desktop status panel on the home chat layout', () => {
-    mockState = createMockStoreState('status');
+  it('shows recognition placeholder immediately after a user message is pending', () => {
+    mockState.messages = [
+      {
+        id: 'user-1',
+        type: 'user',
+        content: '帮我整理一个汇报方案',
+        timestamp: new Date(2026, 1, 26, 19, 35, 0).getTime(),
+      },
+    ];
+    mockState.isLoading = true;
+    mockState.hasActiveInvocation = true;
 
     act(() => {
-      root.render(React.createElement(ChatContainer, { threadId: 'default' }));
+      root.render(React.createElement(ChatContainer, { threadId: 'thread-1' }));
     });
 
-    expect(container.querySelector('[data-testid="right-status-panel"]')).toBeNull();
+    expect(container.textContent).toContain('主智能体');
+    expect(container.textContent).toContain('正在识别你的需求');
+    expect(container.querySelector('[data-testid="intent-recognition-placeholder"]')).toBeTruthy();
   });
 
-  it('does not render the desktop workspace panel on the home chat layout', () => {
-    mockState = createMockStoreState('workspace');
+  it('hides recognition placeholder once intent mode arrives', () => {
+    mockState.messages = [
+      {
+        id: 'user-1',
+        type: 'user',
+        content: '帮我整理一个汇报方案',
+        timestamp: new Date(2026, 1, 26, 19, 35, 0).getTime(),
+      },
+    ];
+    mockState.isLoading = true;
+    mockState.hasActiveInvocation = true;
 
     act(() => {
-      root.render(React.createElement(ChatContainer, { threadId: 'default' }));
+      root.render(React.createElement(ChatContainer, { threadId: 'thread-1' }));
+    });
+    expect(container.querySelector('[data-testid="intent-recognition-placeholder"]')).toBeTruthy();
+
+    mockState.intentMode = 'execute';
+    act(() => {
+      root.render(React.createElement(ChatContainer, { threadId: 'thread-1' }));
     });
 
-    expect(container.querySelector('[data-testid="workspace-panel"]')).toBeNull();
+    expect(container.querySelector('[data-testid="intent-recognition-placeholder"]')).toBeFalsy();
+    expect(container.querySelector('[data-testid="thinking-indicator"]')).toBeTruthy();
   });
 });
